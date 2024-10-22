@@ -1,5 +1,7 @@
 package com.shop.config;
 
+import com.shop.service.MemberService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -7,28 +9,37 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Autowired
+    MemberService memberService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/public/**").permitAll()  // 특정 경로는 인증 없이 접근 가능
-                        .anyRequest().authenticated()  // 나머지 모든 요청은 인증 필요
-                )
-                .formLogin(form -> form   // 폼 기반 로그인 사용
-                        .loginPage("/login")  // 사용자 정의 로그인 페이지
-                        .permitAll()  // 로그인 페이지는 누구나 접근 가능
-                )
-                .logout(logout -> logout
-                        .permitAll()  // 로그아웃도 누구나 접근 가능
-                );
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        return http.authorizeHttpRequests(authorizeHttpRequestsCustomizer -> authorizeHttpRequestsCustomizer
+                        .requestMatchers("/css/**", "/js/**", "/img/**").permitAll()
+                        .requestMatchers("/", "/members/**", "/item/**", "/images/**").permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest()
+                        .authenticated()
+                ).formLogin(formLoginCustomizer -> formLoginCustomizer
+                        .loginPage("/members/login")
+                        .defaultSuccessUrl("/")
+                        .usernameParameter("email")
+                        .failureUrl("/members/login/error")
+                        .failureHandler(new CustomAuthenticationFailureHandler())
+                ).logout( logoutCustomizer -> logoutCustomizer
+                        .logoutRequestMatcher(new AntPathRequestMatcher("/members/logout"))
+                        .logoutSuccessUrl("/")
 
-        return http.build();
+                )
+                .build()
+                ;
     }
 
     @Bean
